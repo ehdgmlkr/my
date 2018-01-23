@@ -1,0 +1,486 @@
+
+
+----------------------------------------------------------------------------------------------------------------
+
+p.332    7장 Constraint 제약조건
+
+----------------------------------------------------------------------------------------------------------------
+전에 배웠던 학습내용 복습함
+
+ 4대 쿼리 문장 
+
+select ~ from             SELECT col1,col2,... | * FROM T WHERE C ORDER BY asc|desc GROUP BY Col HAVING C
+insert into ~ values      INSERT into T(col1, col2, ...) VALUES (v1,v2,...) 
+delete from               DELETE FROM T WHERE C
+uodate set                UPDATE T SET col1=v1, col2=v2, ... WHERE C
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+p.332 ~
+
+5가지 제약조건
+
+NN = NOT NULL      이 조건이 설정된 컬럼에는 NULL 값이 입력되지 못하도록 한다.
+CK = CHECK         이 조건에서 설정된 값만 입력을 허용하고 나머지는 거부된다.
+UK = UNIQUE        이 조건이 설정된 컬럼에는 중복된 값이 입력되지 못하도록 한다.
+FK = FOREIGN KEY   이 조건은 다른 테이블의 컬럼을 참조해서 검사한다.
+PK = PRIMARY KEY   이 조건은 NOT NULL + UNIQUE 의 특징을 가지며 테이블 내에서 데이터들끼리의 
+                   유일성을 보장하는 컬럼을 설정함. 
+                   테이블당 1개만 설정 할수 있다.
+
+REFERENCES 참조하라는 의미
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+1) 테이블 생성시 제약조건 명시
+
+create table new_emp1(
+   no number(4) constraint emp1_no_pk primary key,
+   name varchar(20) constraint emp1_name_nn not null,
+   jumin varchar(13) constraint emp1_jumin_nn not null
+                    constraint emp1_jumin_uk unique,
+   loc_code number(1) constraint emp1_area_ck check(loc_code < 5),
+   deptno number(4,0) constraint emp1_deptno_fk references departments(department_id)
+ );  
+
+desc new_emp1;
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+2) 제약 조건 확인 (하단에 뜨는 오류메세지로 확인을 하는 과정)
+
+select * from user_constraints where table_name = 'NEW_EMP1'; 무조건 대문자로 입력해야함
+
+ㄱ) PK 확인 
+insert into new_emp1(name, jumin, loc_code, deptno) values('hong','123-1234',1,80); no안에 null 값을 입력할 수 없다고 뜸
+
+ㄴ) ㄱ번 수정
+insert into new_emp1(no,name, jumin, loc_code, deptno) values('hong','123-1234',1,80); 
+
+ㄷ) no컬럼에 중복 데이터를 입력
+insert into new_emp1(no,name, jumin, loc_code, deptno) values('hong','123-1234',1,80); 무결성 제약조건 에 위배된다. 에러뜸
+
+ㄹ) name갑의 제약조건 위배체크(not null)
+insert into new_emp1(no,jumin, loc_code, deptno) values(3,'123-4444',1,80); 
+
+ㅁ) jumin값의 제약조건 위배체크(not null, unique)
+insert into new_emp1(no,name, loc_code, deptno) values(4,'kim',1,80); 
+
+insert into new_emp1(no,name, jumin, loc_code, deptno) values(4,'kim','111-2222',1,80); 
+insert into new_emp1(no,name, jumin, loc_code, deptno) values(5,'lee','111-2222',1,80); 
+
+ㅂ) loc_code 값의 제약조건 위배체크 (check)
+insert into new_emp1(no,name, jumin, loc_code, deptno) values(6,'lee','111-3333',6,80); 
+
+ㅂ) deptno 값의 조건 위배체크 (fk)
+insert into new_emp1(no,name, jumin, loc_code, deptno) values(7,'park','111-4444',3,3380); 
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+3) constraint 명 없이 제약조건 명시하기
+
+create table new_emp2(
+ no number(4) PRIMARY key,
+ name VARCHAR(20) not null,
+ jumin VARCHAR (13) not null UNIQUE,
+ loc_code number(1) check( loc_code < 5),
+ deptno number(4,0) REFERENCES departments(department_id)
+);
+
+select * from user_constraints where table_name = 'NEW_EMP2';
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+4) 기존 테이블에 제약조건을 추가하는 방법
+
+ㄱ)pk,uk,ck,fk는 alter table add 속성을 사용해서 추가
+alter table new_emp2 add constraint emp2_name_uk unique(name);
+
+
+ㄴ)null, not null은 alter table modify 속성을 사용해서 변경
+alter table new_emp2 modify(loc_code constraint emp2_loccode_nn not null);
+
+
+--제약조건 확인하는 문--
+select * from user_constraints where table_name = 'NEW_EMP2';
+----------------------------------------------------------------------------------------------------------------
+
+ 제약조건의 활성화와 비활성화 
+
+----------------------------------------------------------------------------------------------------------------
+
+disable (비활성화)
+ - novalidate : 해당 제약 조건을 임시로 비활성화
+ - validate : 해당 컬럼의 값을 수정하지 못하도록 설정
+             (insert, update, delete문을 사용할 수 없음)
+
+create table t_novalidate(
+ no number constraint t_novalidate_no_pk primary key,
+ name varchar(10) constraint t_novalidate_name_nn not null
+);
+
+
+create table t_validate(
+ no number constraint t_validate_no_pk primary key,
+ name varchar(10) constraint t_validate_name_nn not null
+);
+
+
+create table t_enable(
+ no number constraint t_enable_no_pk primary key,
+ name varchar(10) constraint t_enable_name_nn not null
+);
+
+
+insert into t_novalidate values(1,'aaa');
+insert into t_novalidate values(2,'bbb');
+insert into t_novalidate values(3,'ccc');
+commit;
+select * from t_novalidate;
+
+1) 중복오류 발생
+insert into t_novalidate values(1,'aaa');
+
+2) 제약 조건을 disable novalidate 속성으로 비활성화
+alter table t_novalidate disable novalidate constraint t_novalidate_no_pk;
+
+3) 중복 데이터 삽입
+insert into t_novalidate values(1,'aaa');
+select * from t_novalidate;
+
+4) t_validate에 데이터 삽입
+insert into t_validate values(1,'aaa');
+insert into t_validate values(2,'bbb');
+insert into t_validate values(3,'ccc');
+commit;
+select * from t_validate;
+
+5) t_validate 테이블에 disable validate 속성으로 제약 조건 비활성화
+alter table t_validate disable validate constraint t_validate_no_pk;
+
+6) t_validate 테이블의 제약 조건을 비활성화 했음에도 불구하고 중복 데이터가 삽입되지 않음 (오류메세지)
+insert into t_validate values(1,'aaa');
+insert into t_validate values(4,'aaa');
+
+----------------------------------------------------------------------------------------------------------------
+
+p.361 연습문제 풀어보기
+
+----------------------------------------------------------------------------------------------------------------
+
+1번 문제풀이
+
+create table tcons ( 
+        no number(5) CONSTRAINT tcons_no_pk PRIMARY KEY,
+        name varchar2(20) CONSTRAINT tcons_name_nn NOT NULL,
+        jumin varchar2(13) CONSTRAINT tcons_jumin_nn NOT NULL  
+                                   CONSTRAINT tcons_jumin_uk UNIQUE,  
+        area number(1) CONSTRAINT tcons_area_ck CHECK( area < 5 ),
+        deptno number(4,0) CONSTRAINT tcons_deptno_fk REFERENCES departments(department_id)
+);
+
+select * from tcons;
+
+
+2번 문제풀이
+
+3번 문제풀이
+
+4번 문제풀이
+
+
+----------------------------------------------------------------------------------------------------------------
+
+p.366    8장 INDEX 인덱스
+
+----------------------------------------------------------------------------------------------------------------
+
+select employee_id from emp2;
+
+-------------------------------------
+-- Unique INDEX
+-------------------------------------
+
+1) emp2 테이블의 employee_id를 unique index로 생성
+create unique index idx_emp2_employee_id on emp2(employee_id);
+
+
+2) emp2 테이블의 first_name을 non-unique index로 생성
+create index idx_emp2_first_name on emp2(first_name);
+
+
+3) first_name, department_id를 사용하여 결합 index 생성
+create index idx_emp2_first_dept on emp2(first_name, department_id);
+
+
+4) emp2에 설정된 index 확인
+select * from user_ind_columns where table_name = 'EMP2';
+select * from user_indexes where table_name = 'EMP2';
+
+
+5) index 모니터링 사용
+alter index idx_emp2_first_name MONITORING USAGE;
+
+
+6) index 사용 유무 확인
+select * from v$object_usage;
+select first_name from emp2 where first_name like '%sm%';
+
+
+7) index 값을 재설정
+alter index idx_emp2_first_name rebuild;
+
+-------------------------------------
+-- Simple view
+-------------------------------------
+
+1) 입사년이 2007년인 직원의 아이디, 성명, 이메일, 연락처, 급여만을 갖는 v_emp1
+create view v_emp1
+as
+
+select employee_id, first_name, email, phone_number, salary
+from employees
+where to_char(hire_date,'rrrr') = '2007';
+
+select * from v_emp1;  
+select * from v_emp1 where salary >= 7000;
+
+
+
+2) 사번, 성명, 부서코드, 부서면을 갖는 v_emp2 뷰를 생성
+
+create view v_emp2
+as
+
+select employee_id, first_name, e.department_id, d.department_name
+from employees e join departments d
+ON e.department_id = d.department_id;
+
+select * from v_emp2;
+
+
+3) view 테이블 확인 
+select * from user_views;
+
+
+4) view 삭제
+drop view v_emp1;
+drop view v_emp2;
+
+
+5) 사번,성명,이메일,부서코드,부서명, 급여를 갖는 mview를 생성(mv_emp)
+create MATERIALIZED view mv_emp
+BUILD IMMEDIATE
+REFRESH on DEMAND COMPLETE ENABLE QUERY REWRITE
+as
+
+select employee_id, first_name, email, e.department_id, department_name, salary
+from employees e join departments d
+ON e.department_id = d.department_id;
+권한이 없다고 뜬다.
+권한을 주는 명령어를 친다.
+
+grant create MATERIALIZED view to hr;
+
+select * from mv_emp;
+
+
+-----------------------------------------------------------------------------------★★★★★★★★★★★★★★★★★★
+★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+-----------------------------------------------------------------------------------★★★★★★★★★★★★★★★★★★★
+-- PK(Primary Key) only one per table
+-- NN(Not Null) null is not permitted
+-- CK(Check) check if it is okay with a condition
+-- FK(Foreign Key) refer to a column from another table
+-- UK(Unique Key) can not be repeated
+
+-- 제약 조건(constraint)
+
+--1) table 생성시 제약 조건 명시
+create table new_emp1(
+no number(4) constraint emp1_no_pk primary key,
+name varchar(20) constraint emp1_name_nn not null,
+jumin varchar(13) constraint emp1_jumin_nn not null
+               constraint emp1_jumin_uk unique,
+loc_code number(1) constraint emp1_area_ck check(loc_code<5),               
+deptno number(4,0) constraint emp1_deptno_fk references departments(department_id)
+);
+desc new_emp1;
+
+--제약 조건 확인
+select * from user_constraints where table_name = 'NEW_EMP1';
+
+--A) PK확인
+insert into new_emp1(name, jumin, loc_code, deptno) values('park', '123-1234', 1, 80);
+--B) A번 수정
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(1, 'park', '123-1234', 1, 80);
+--C) no컬럼에 중복 데이터를 입력
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(1, 'park', '123-1234', 1, 80);
+--D) name값의 제약조건 유배 체크(not null)
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(1, '', '123-1234', 1, 80);
+--E) jumin 값의 제약 조건 유배 체크(not null, unique)
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(2, 'park', '', 1, 80);
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(2, 'park', '123-1234', 1, 80);
+--F) loc_code 값의 제약조건 위배 체크(check)
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(2, 'park', '123-1234', 6, 80);
+--G) deptno 값의 제약조건 위배 체크(fk)
+insert into new_emp1(no, name, jumin, loc_code, deptno) values(2, 'park', '123-12345', 1, 280);
+
+select * from new_emp1;
+
+--2) constraint 명 없이 제약 조건 명시하기
+
+create table new_emp2(
+no number(4) primary key,
+name varchar(20) not null,
+jumin varchar(13) not null unique,
+loc_code number(1) check(loc_code<5),
+deptno number(4,0) references departments(department_id)
+);
+
+select * from user_constraints where table_name = 'NEW_EMP2';
+
+--3) 기존 테이블에 제약조건을 추가
+
+--A) pk, uk, ck, fk는 alter table add 속성을 사용해서 추가  p337
+
+alter table new_emp2 add constraint emp2_name_uk unique(name);
+
+--B) null, not null은 after table modify 속성을 사용해서 변경
+
+alter table new_emp2 modify(loc_code constraint emp2_loccode_nn not null);
+
+-- 제약조건 확인
+SELECT * from user_constraints where table_name = 'NEW_EMP2';
+/*
+ disable novalidate: contraints를 중지
+-- disable validate: 데이터 자체를 수정을 못하게함
+*/
+
+-- 제약 조건의 활성화와 비활성화
+/*
+disable (비활성화)
+- novalidate : 해당 제약 조건을 임시로 비활성화
+- validate : 해당 컬럼의 값을 수정하지 못하도록 설정(insert, update, delete문을 사용할 수 없음)
+*/
+
+create table t_novalidate(
+no number constraint t_novalidate_no_pk primary key,
+name varchar(10) constraint t_novalidate_name_nn not null
+);
+
+create table t_validate(
+no number constraint t_validate_no_pk primary key,
+name varchar(10) constraint t_validate_name_nn not null
+);
+
+create table t_enable(
+no number constraint t_enable_no_pk primary key,
+name varchar(10) constraint t_enable_name_nn not null
+);
+
+insert into t_novalidate values(1, 'aaaa');
+insert into t_novalidate values(2, 'bbbb');
+insert into t_novalidate values(3, 'cccc');
+
+commit;
+select * from t_novalidate;
+
+--1) 중복 오류 발생
+insert into t_novalidate values(1, 'aaaa');
+--2) 제약조건을 임시로 해제
+alter table t_novalidate disable novalidate constraint t_novalidate_no_pk;
+--3) 중복 데이터 삽입
+insert into t_novalidate values(1, 'aaaa');
+select * from t_novalidate;
+--4) t_validate에 데이터 삽입
+insert into t_validate values(1, 'aaaa');
+insert into t_validate values(2, 'bbbb');
+insert into t_validate values(3, 'cccc');
+--5) t_validate table에 disable validate 속성으로 제약조건 비활성화
+alter table t_validate disable validate constraint t_validate_no_pk;
+--6) t_validate table의 제약 조건을 비활성화 했음에도 불구하고 중복 데이터가 삽입되지 않음 데이타 수정 자체가 불가
+insert into t_validate values(1, 'aaaa');
+insert into t_validate values(4, 'dddd');
+
+
+-- p.361 answers (책에 나와있는 문제이기 때문에 2번은 실행되지 않음)
+create table tcons(
+no number(5) constraint tcons_no_pk primary key,
+name varchar(20) constraint tcons_name_nn not null,
+jumin varchar(13) constraint tcons_jumin_nn not null 
+                      CONSTRAINT tcons_jumin_uk unique,
+area number(1) constraint tcons_area_ck check(area<5),
+deptno number(4,0) constraint tcons_deptno_fk references departments(department_id)
+);
+
+--2)
+alter table tcons add constraint tcons_deptno_fk foreign key(name) references emp2(emp2_name);
+--3) 
+alter table tcons disable validate constraint tcons_jumin_uk;
+--4)
+alter table tcons enable validate constraint tcons_jumin_uk;
+--5)
+select table_name, column_name, constraint_name from user_cons_columns where table_name = 'EMP';
+
+select * from emp;
+select * from user_cons_columns where table_name = 'EMP';
+
+select employee_id from emp2_EMPLOYEE_ID;
+-- Unique INDEX
+--1) emp2 table의 employee_id를 unique index로 생성(unique index로 해야 하지만 중복 값이 있으므로 index로 그냥 씀)
+create index idx_emp2_employee_id on emp2(employee_id);
+
+--2) emp2 table의 first_name을 non-unique tindex로 생성
+create index idx_emp2_first_name on emp2(first_name);
+
+--3) first_name, department_id를 사용하여 결합 index 생성
+create index idx_emp2_first_dept on emp2(first_name, department_id);
+
+--4) emp2에 설정된 index 확인
+select * from user_ind_columns where table_name = 'EMP2';
+select * from user_indexes where table_name = 'EMP2';
+
+--5) index monitoring 사용 여부
+alter index idx_emp2_first_name monitoring usage;
+
+--6) index 사용 유무 확인
+select * from v$object_usage;
+-- 글짜 사이에 sm들어가 있는 이름 출력
+select first_name from emp2 where first_name like '%sm%';
+
+--7) index 값을 재설정
+alter index idx_emp2_first_name rebuild;
+
+--Simple view
+
+--1) 입사년이 2007년인 직원의 아이디, 성명, 이메일, 연락처, 급여만을 갖는 v_emp1
+
+create view v_emp1
+as select EMPLOYEE_ID, FIRST_NAME, EMAIL, PHONE_NUMBER, SALARY
+from EMPLOYEES;
+where to_char(hire_date, 'yyyy') = 2007;
+select * from v_emp1;
+select * from v_emp1 where salary>=7000;
+
+--2) 사번, 성명, 부서코드, 부서명을 갖는 v_emp2 view 생성
+
+create view v_emp2
+as select EMPLOYEE_ID, FIRST_NAME, e.DEPARTMENT_ID, d.DEPARTMENT_NAME 
+from EMPLOYEES e join DEPARTMENTS d
+on e.department_id = d.department_id;
+
+select * from v_emp2;
+
+--3) 만들어진 views 보기
+select * from user_views;
+
+--4) 만들어진 views 삭제하기
+drop view v_emp1;
+drop view v_emp2;
+
+--5) 사번, 성명, 이메일, 부서코드, 부서명, 급여를 갖는 mview를 생성(mv_emp) 버젼상 안됨 ㅋㅋㅋ
+
+create materialized view mv_emp
+build immediate
+refresh on demand complete enable QUERY rewrite 
+as select EMPLOYEE_ID, FIRST_NAME, EMAIL, e.DEPARTMENT_ID, d.DEPARTMENT_NAME, SALARY
+from EMPLOYEES e join DEPARTMENTS d
+on e.department_id = d.department_id;
